@@ -42,6 +42,7 @@ jobs:
          api_key: ${{ secrets.BUNNYNET_API_KEY }}
          container: app
          image_tag: "${{ github.sha }}"
+         deploy: "true"
 ```
 
 ## Inputs
@@ -53,3 +54,4 @@ This action requires the following inputs:
 - *container* (required): The name of the container within the Magic Containers App;
 - *image_tag* (required): The new image tag;
 - *image_digest* (optional): The digest of new image;
+- *deploy* (optional): Set to `"true"` to trigger a deploy after updating the image. Defaults to `"false"`;

@@ -26,6 +26,11 @@ inputs:
     description: The digest of the new image.
     required: false
 
+  deploy:
+    description: Trigger a deploy after updating the image. Set to "true" to enable.
+    required: false
+    default: 'false'
+
 runs:
   using: 'node24'
   main: '.lib-action/index.js'

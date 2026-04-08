@@ -6,6 +6,7 @@ export async function run() {
   const containerName = core.getInput("container", { required: true });
   const imageTag = core.getInput("image_tag", { required: true });
   const imageDigest = core.getInput("image_digest");
+  const deploy = core.getInput("deploy").toLowerCase() === 'true';
 
   try {
     const appConfig = await getAppConfiguration(apiKey, appId);
@@ -26,7 +27,13 @@ export async function run() {
       console.log(`Updating container "${containerName}" (${containerId}) with tag "${imageTag}", digest "${imageDigest}"`);
     }
 
-    patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest);
+    await patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest);
+
+    if (deploy) {
+      console.log(`Triggering deploy for app "${appId}"...`);
+      await deployApp(apiKey, appId);
+      console.log(`Deploy triggered successfully.`);
+    }
   } catch (e) {
     if (typeof e === 'string' || e instanceof Error) {
       core.setFailed(e);
@@ -110,6 +117,30 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
       .catch(e => {
         console.error(e);
         reject('Could not save container configuration.');
+      })
+    ;
+  });
+}
+
+async function deployApp(apiKey: string, appId: string): Promise<void> {
+  return new Promise((resolve, reject) => {
+    fetch(`https://api.bunny.net/mc/apps/${appId}/deploy`, {
+      method: 'POST',
+      headers: {
+        'AccessKey': apiKey,
+      },
+    })
+      .then(response => {
+        if (response.status !== 200) {
+          reject(`Could not trigger deploy: HTTP status ${response.status}.`);
+          return;
+        }
+
+        resolve();
+      })
+      .catch(e => {
+        console.error(e);
+        reject('Could not trigger deploy.');
       })
     ;
   });

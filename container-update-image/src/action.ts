@@ -31,26 +31,7 @@ export async function run() {
 
     if (deploy) {
       console.log(`Triggering deploy for app "${appId}"...`);
-      // Re-fetch the full config after the container PATCH so we have
-      // the container template with all required fields for app PATCH.
-      const updatedConfig = await getAppConfiguration(apiKey, appId);
-      const updatedContainer = updatedConfig.containerTemplates.find(v => v.id === containerId);
-      if (!updatedContainer) {
-        throw new Error(`Container "${containerName}" not found after update.`);
-      }
-      // Only send the fields the PATCH endpoint requires — the GET
-      // response includes nested objects (endpoints, etc.) in a format
-      // that doesn't pass PATCH validation.
-      await deployApp(apiKey, appId, {
-        id: updatedContainer.id,
-        name: updatedContainer.name,
-        imageName: updatedContainer.imageName,
-        imageNamespace: updatedContainer.imageNamespace,
-        imageRegistryId: updatedContainer.imageRegistryId,
-        imageTag: updatedContainer.imageTag,
-        imagePullPolicy: updatedContainer.imagePullPolicy,
-        ...(updatedContainer.imageDigest ? { imageDigest: updatedContainer.imageDigest } : {}),
-      });
+      await deployApp(apiKey, appId);
       console.log(`Deploy triggered successfully.`);
     }
   } catch (e) {
@@ -141,10 +122,9 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
   });
 }
 
-async function deployApp(apiKey: string, appId: string, containerTemplate: Record<string, unknown>): Promise<void> {
-  // PATCH the application with the full container template.
-  // This applies the changes and triggers a rollout, equivalent to
-  // clicking "Apply" in the Bunny dashboard.
+async function deployApp(apiKey: string, appId: string): Promise<void> {
+  // PATCH the application with an empty body to trigger a rollout
+  // after the container image has been updated via container PATCH.
   return new Promise((resolve, reject) => {
     fetch(`https://api.bunny.net/mc/apps/${appId}`, {
       method: 'PATCH',
@@ -152,9 +132,7 @@ async function deployApp(apiKey: string, appId: string, containerTemplate: Recor
         'Content-Type': 'application/json',
         'AccessKey': apiKey,
       },
-      body: JSON.stringify({
-        containerTemplates: [containerTemplate],
-      }),
+      body: JSON.stringify({}),
     })
       .then(async response => {
         if (response.status !== 200) {
@@ -179,11 +157,5 @@ type AppConfiguration = {
   containerTemplates: Array<{
     id: string;
     name: string;
-    imageName: string;
-    imageNamespace: string;
-    imageRegistryId: string;
-    imageTag: string;
-    imagePullPolicy: string;
-    imageDigest?: string;
   }>;
 }

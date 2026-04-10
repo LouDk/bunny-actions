@@ -31,7 +31,14 @@ export async function run() {
 
     if (deploy) {
       console.log(`Triggering deploy for app "${appId}"...`);
-      await deployApp(apiKey, appId, containerId, imageTag, imageDigest);
+      // Re-fetch the full config after the container PATCH so we have
+      // the complete container template with all required fields.
+      const updatedConfig = await getAppConfiguration(apiKey, appId);
+      const updatedContainer = updatedConfig.containerTemplates.find(v => v.id === containerId);
+      if (!updatedContainer) {
+        throw new Error(`Container "${containerName}" not found after update.`);
+      }
+      await deployApp(apiKey, appId, updatedContainer);
       console.log(`Deploy triggered successfully.`);
     }
   } catch (e) {
@@ -122,19 +129,10 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
   });
 }
 
-async function deployApp(apiKey: string, appId: string, containerId: string, imageTag: string, imageDigest?: string): Promise<void> {
-  // PATCH the application with the updated container template.
+async function deployApp(apiKey: string, appId: string, containerTemplate: Record<string, unknown>): Promise<void> {
+  // PATCH the application with the full container template.
   // This applies the changes and triggers a rollout, equivalent to
   // clicking "Apply" in the Bunny dashboard.
-  const container: Record<string, string> = {
-    id: containerId,
-    imageTag: imageTag,
-  };
-
-  if (imageDigest !== undefined && imageDigest.length > 0) {
-    container.imageDigest = imageDigest;
-  }
-
   return new Promise((resolve, reject) => {
     fetch(`https://api.bunny.net/mc/apps/${appId}`, {
       method: 'PATCH',
@@ -143,7 +141,7 @@ async function deployApp(apiKey: string, appId: string, containerId: string, ima
         'AccessKey': apiKey,
       },
       body: JSON.stringify({
-        containerTemplates: [container],
+        containerTemplates: [containerTemplate],
       }),
     })
       .then(async response => {
@@ -166,7 +164,7 @@ async function deployApp(apiKey: string, appId: string, containerId: string, ima
 
 type AppConfiguration = {
   id: string;
-  containerTemplates: Array<{
+  containerTemplates: Array<Record<string, unknown> & {
     id: string;
     name: string;
   }>;

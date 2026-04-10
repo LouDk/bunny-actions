@@ -25720,7 +25720,14 @@ function run() {
             yield patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest);
             if (deploy) {
                 console.log(`Triggering deploy for app "${appId}"...`);
-                yield deployApp(apiKey, appId, containerId, imageTag, imageDigest);
+                // Re-fetch the full config after the container PATCH so we have
+                // the complete container template with all required fields.
+                const updatedConfig = yield getAppConfiguration(apiKey, appId);
+                const updatedContainer = updatedConfig.containerTemplates.find(v => v.id === containerId);
+                if (!updatedContainer) {
+                    throw new Error(`Container "${containerName}" not found after update.`);
+                }
+                yield deployApp(apiKey, appId, updatedContainer);
                 console.log(`Deploy triggered successfully.`);
             }
         }
@@ -25801,18 +25808,11 @@ function patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest) {
         });
     });
 }
-function deployApp(apiKey, appId, containerId, imageTag, imageDigest) {
+function deployApp(apiKey, appId, containerTemplate) {
     return __awaiter(this, void 0, void 0, function* () {
-        // PATCH the application with the updated container template.
+        // PATCH the application with the full container template.
         // This applies the changes and triggers a rollout, equivalent to
         // clicking "Apply" in the Bunny dashboard.
-        const container = {
-            id: containerId,
-            imageTag: imageTag,
-        };
-        if (imageDigest !== undefined && imageDigest.length > 0) {
-            container.imageDigest = imageDigest;
-        }
         return new Promise((resolve, reject) => {
             fetch(`https://api.bunny.net/mc/apps/${appId}`, {
                 method: 'PATCH',
@@ -25821,7 +25821,7 @@ function deployApp(apiKey, appId, containerId, imageTag, imageDigest) {
                     'AccessKey': apiKey,
                 },
                 body: JSON.stringify({
-                    containerTemplates: [container],
+                    containerTemplates: [containerTemplate],
                 }),
             })
                 .then((response) => __awaiter(this, void 0, void 0, function* () {

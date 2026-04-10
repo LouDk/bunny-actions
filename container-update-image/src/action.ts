@@ -31,7 +31,7 @@ export async function run() {
 
     if (deploy) {
       console.log(`Triggering deploy for app "${appId}"...`);
-      await deployApp(apiKey, appId);
+      await deployApp(apiKey, appId, appConfig.name);
       console.log(`Deploy triggered successfully.`);
     }
   } catch (e) {
@@ -122,8 +122,8 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
   });
 }
 
-async function deployApp(apiKey: string, appId: string): Promise<void> {
-  // PATCH the application with an empty body to trigger a rollout
+async function deployApp(apiKey: string, appId: string, appName: string): Promise<void> {
+  // PATCH the application with its current name to trigger a rollout
   // after the container image has been updated via container PATCH.
   return new Promise((resolve, reject) => {
     fetch(`https://api.bunny.net/mc/apps/${appId}`, {
@@ -132,7 +132,7 @@ async function deployApp(apiKey: string, appId: string): Promise<void> {
         'Content-Type': 'application/json',
         'AccessKey': apiKey,
       },
-      body: JSON.stringify({}),
+      body: JSON.stringify({ name: appName }),
     })
       .then(async response => {
         if (response.status !== 200) {
@@ -154,6 +154,7 @@ async function deployApp(apiKey: string, appId: string): Promise<void> {
 
 type AppConfiguration = {
   id: string;
+  name: string;
   containerTemplates: Array<{
     id: string;
     name: string;

@@ -25720,7 +25720,7 @@ function run() {
             yield patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest);
             if (deploy) {
                 console.log(`Triggering deploy for app "${appId}"...`);
-                yield deployApp(apiKey, appId);
+                yield deployApp(apiKey, appId, appConfig.name);
                 console.log(`Deploy triggered successfully.`);
             }
         }
@@ -25801,9 +25801,9 @@ function patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest) {
         });
     });
 }
-function deployApp(apiKey, appId) {
+function deployApp(apiKey, appId, appName) {
     return __awaiter(this, void 0, void 0, function* () {
-        // PATCH the application with an empty body to trigger a rollout
+        // PATCH the application with its current name to trigger a rollout
         // after the container image has been updated via container PATCH.
         return new Promise((resolve, reject) => {
             fetch(`https://api.bunny.net/mc/apps/${appId}`, {
@@ -25812,7 +25812,7 @@ function deployApp(apiKey, appId) {
                     'Content-Type': 'application/json',
                     'AccessKey': apiKey,
                 },
-                body: JSON.stringify({}),
+                body: JSON.stringify({ name: appName }),
             })
                 .then((response) => __awaiter(this, void 0, void 0, function* () {
                 if (response.status !== 200) {

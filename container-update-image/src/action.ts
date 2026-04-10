@@ -32,13 +32,25 @@ export async function run() {
     if (deploy) {
       console.log(`Triggering deploy for app "${appId}"...`);
       // Re-fetch the full config after the container PATCH so we have
-      // the complete container template with all required fields.
+      // the container template with all required fields for app PATCH.
       const updatedConfig = await getAppConfiguration(apiKey, appId);
       const updatedContainer = updatedConfig.containerTemplates.find(v => v.id === containerId);
       if (!updatedContainer) {
         throw new Error(`Container "${containerName}" not found after update.`);
       }
-      await deployApp(apiKey, appId, updatedContainer);
+      // Only send the fields the PATCH endpoint requires — the GET
+      // response includes nested objects (endpoints, etc.) in a format
+      // that doesn't pass PATCH validation.
+      await deployApp(apiKey, appId, {
+        id: updatedContainer.id,
+        name: updatedContainer.name,
+        imageName: updatedContainer.imageName,
+        imageNamespace: updatedContainer.imageNamespace,
+        imageRegistryId: updatedContainer.imageRegistryId,
+        imageTag: updatedContainer.imageTag,
+        imagePullPolicy: updatedContainer.imagePullPolicy,
+        ...(updatedContainer.imageDigest ? { imageDigest: updatedContainer.imageDigest } : {}),
+      });
       console.log(`Deploy triggered successfully.`);
     }
   } catch (e) {
@@ -164,8 +176,14 @@ async function deployApp(apiKey: string, appId: string, containerTemplate: Recor
 
 type AppConfiguration = {
   id: string;
-  containerTemplates: Array<Record<string, unknown> & {
+  containerTemplates: Array<{
     id: string;
     name: string;
+    imageName: string;
+    imageNamespace: string;
+    imageRegistryId: string;
+    imageTag: string;
+    imagePullPolicy: string;
+    imageDigest?: string;
   }>;
 }

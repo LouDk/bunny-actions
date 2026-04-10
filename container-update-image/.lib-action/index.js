@@ -25721,13 +25721,16 @@ function run() {
             if (deploy) {
                 console.log(`Triggering deploy for app "${appId}"...`);
                 // Re-fetch the full config after the container PATCH so we have
-                // the complete container template with all required fields.
+                // the container template with all required fields for app PATCH.
                 const updatedConfig = yield getAppConfiguration(apiKey, appId);
                 const updatedContainer = updatedConfig.containerTemplates.find(v => v.id === containerId);
                 if (!updatedContainer) {
                     throw new Error(`Container "${containerName}" not found after update.`);
                 }
-                yield deployApp(apiKey, appId, updatedContainer);
+                // Only send the fields the PATCH endpoint requires — the GET
+                // response includes nested objects (endpoints, etc.) in a format
+                // that doesn't pass PATCH validation.
+                yield deployApp(apiKey, appId, Object.assign({ id: updatedContainer.id, name: updatedContainer.name, imageName: updatedContainer.imageName, imageNamespace: updatedContainer.imageNamespace, imageRegistryId: updatedContainer.imageRegistryId, imageTag: updatedContainer.imageTag, imagePullPolicy: updatedContainer.imagePullPolicy }, (updatedContainer.imageDigest ? { imageDigest: updatedContainer.imageDigest } : {})));
                 console.log(`Deploy triggered successfully.`);
             }
         }

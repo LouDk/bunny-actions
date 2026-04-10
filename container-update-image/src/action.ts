@@ -123,12 +123,19 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
 }
 
 async function deployApp(apiKey: string, appId: string): Promise<void> {
+  // Fetch the full (updated) app configuration and PUT it back.
+  // This is equivalent to clicking "Apply" in the Bunny dashboard,
+  // which actually triggers the container rollout.
+  const appConfig = await getAppConfiguration(apiKey, appId);
+
   return new Promise((resolve, reject) => {
-    fetch(`https://api.bunny.net/mc/apps/${appId}/deploy`, {
-      method: 'POST',
+    fetch(`https://api.bunny.net/mc/apps/${appId}`, {
+      method: 'PUT',
       headers: {
+        'Content-Type': 'application/json',
         'AccessKey': apiKey,
       },
+      body: JSON.stringify(appConfig),
     })
       .then(response => {
         if (response.status !== 200) {

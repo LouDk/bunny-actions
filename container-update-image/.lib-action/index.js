@@ -25720,7 +25720,7 @@ function run() {
             yield patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest);
             if (deploy) {
                 console.log(`Triggering deploy for app "${appId}"...`);
-                yield deployApp(apiKey, appId);
+                yield deployApp(apiKey, appId, containerId, imageTag, imageDigest);
                 console.log(`Deploy triggered successfully.`);
             }
         }
@@ -25801,28 +25801,38 @@ function patchAppContainer(apiKey, appId, containerId, imageTag, imageDigest) {
         });
     });
 }
-function deployApp(apiKey, appId) {
+function deployApp(apiKey, appId, containerId, imageTag, imageDigest) {
     return __awaiter(this, void 0, void 0, function* () {
-        // Fetch the full (updated) app configuration and PUT it back.
-        // This is equivalent to clicking "Apply" in the Bunny dashboard,
-        // which actually triggers the container rollout.
-        const appConfig = yield getAppConfiguration(apiKey, appId);
+        // PATCH the application with the updated container template.
+        // This applies the changes and triggers a rollout, equivalent to
+        // clicking "Apply" in the Bunny dashboard.
+        const container = {
+            id: containerId,
+            imageTag: imageTag,
+        };
+        if (imageDigest !== undefined && imageDigest.length > 0) {
+            container.imageDigest = imageDigest;
+        }
         return new Promise((resolve, reject) => {
             fetch(`https://api.bunny.net/mc/apps/${appId}`, {
-                method: 'PUT',
+                method: 'PATCH',
                 headers: {
                     'Content-Type': 'application/json',
                     'AccessKey': apiKey,
                 },
-                body: JSON.stringify(appConfig),
+                body: JSON.stringify({
+                    containerTemplates: [container],
+                }),
             })
-                .then(response => {
+                .then((response) => __awaiter(this, void 0, void 0, function* () {
                 if (response.status !== 200) {
+                    const body = yield response.text().catch(() => '');
+                    console.error(`Deploy response (${response.status}): ${body}`);
                     reject(`Could not trigger deploy: HTTP status ${response.status}.`);
                     return;
                 }
                 resolve();
-            })
+            }))
                 .catch(e => {
                 console.error(e);
                 reject('Could not trigger deploy.');

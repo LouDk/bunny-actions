@@ -31,7 +31,7 @@ export async function run() {
 
     if (deploy) {
       console.log(`Triggering deploy for app "${appId}"...`);
-      await deployApp(apiKey, appId);
+      await deployApp(apiKey, appId, containerId, imageTag, imageDigest);
       console.log(`Deploy triggered successfully.`);
     }
   } catch (e) {
@@ -122,23 +122,34 @@ async function patchAppContainer(apiKey: string, appId: string, containerId: str
   });
 }
 
-async function deployApp(apiKey: string, appId: string): Promise<void> {
-  // Fetch the full (updated) app configuration and PUT it back.
-  // This is equivalent to clicking "Apply" in the Bunny dashboard,
-  // which actually triggers the container rollout.
-  const appConfig = await getAppConfiguration(apiKey, appId);
+async function deployApp(apiKey: string, appId: string, containerId: string, imageTag: string, imageDigest?: string): Promise<void> {
+  // PATCH the application with the updated container template.
+  // This applies the changes and triggers a rollout, equivalent to
+  // clicking "Apply" in the Bunny dashboard.
+  const container: Record<string, string> = {
+    id: containerId,
+    imageTag: imageTag,
+  };
+
+  if (imageDigest !== undefined && imageDigest.length > 0) {
+    container.imageDigest = imageDigest;
+  }
 
   return new Promise((resolve, reject) => {
     fetch(`https://api.bunny.net/mc/apps/${appId}`, {
-      method: 'PUT',
+      method: 'PATCH',
       headers: {
         'Content-Type': 'application/json',
         'AccessKey': apiKey,
       },
-      body: JSON.stringify(appConfig),
+      body: JSON.stringify({
+        containerTemplates: [container],
+      }),
     })
-      .then(response => {
+      .then(async response => {
         if (response.status !== 200) {
+          const body = await response.text().catch(() => '');
+          console.error(`Deploy response (${response.status}): ${body}`);
           reject(`Could not trigger deploy: HTTP status ${response.status}.`);
           return;
         }
